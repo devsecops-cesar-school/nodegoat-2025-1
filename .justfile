@@ -214,6 +214,8 @@ setup:
     pre-commit install
     just _info "Installing kind..."
     brew install kind
+    just _info "Installing kubectx and kubens..."
+    brew install kubectx
   elif [[ "{{os()}}" == "linux" ]]; then
     just _info "Installing pre-commit..."
     pip install pre-commit
@@ -226,6 +228,10 @@ setup:
     [ $(uname -m) = aarch64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-arm64
     chmod +x ./kind
     sudo mv ./kind /usr/local/bin/kind
+    just _info "Installing kubectx and kubens..."
+    git clone https://github.com/ahmetb/kubectx /opt/kubectx
+    sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx
+    sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens
   else
     just _error "Operating system {{os()}} not supported!"
     exit 1
