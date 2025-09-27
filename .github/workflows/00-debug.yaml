@@ -1,0 +1,18 @@
+name: 00-debug
+
+on: [pull_request]
+
+jobs:
+  debug:
+    name: Debug Runner Connectivity
+    runs-on: [arc-runner-set]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Test Runner Connectivity
+        run: |
+          echo "Runner is connected!"
+          echo "OS: $(uname -a)"
+          echo "Working directory: $(pwd)"
+          ls -la
