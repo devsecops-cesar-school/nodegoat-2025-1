@@ -12,13 +12,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dependency-check:
-    name: SCA - Syft, Dependency Track
+  sbom-generation:
+    name: SBOM Generation
     runs-on: [arc-runner-set]
     timeout-minutes: 10
     permissions:
-      contents: write          # Write permission required for Dependency Graph submission
-      security-events: write   # Upload SARIF to GitHub Advanced Security
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -33,14 +32,6 @@ jobs:
           output-file: sbom-syft.json
           syft-version: v1.33.0
 
-      - name: Generate SBOM with Trivy
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: cyclonedx
-          output: sbom-trivy.json
-
       - name: Upload SBOM to Dependency Track
         uses: DependencyTrack/gh-upload-sbom@v3
         if: always()
@@ -50,9 +41,19 @@ jobs:
           protocol: 'http'
           apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
           projectName: 'app'
-          projectVersion: ${{ github.head_ref || github.ref_name }}  # Use PR branch name, fallback to ref name
+          projectVersion: ${{ github.head_ref || github.ref_name }}
           bomFilename: sbom-syft.json
           autoCreate: true
+
+  dependency-graph:
+    name: Dependency Graph
+    runs-on: [arc-runner-set]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
       - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
         uses: aquasecurity/trivy-action@0.33.1
@@ -62,6 +63,17 @@ jobs:
           output: 'trivy-dependency-results.sbom.json'
           scan-ref: '.'
           github-pat: ${{ secrets.GITHUB_TOKEN }}
+
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: [arc-runner-set]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
       - name: Scan for Vulnerabilities with Trivy (SARIF)
         id: trivy-sarif
