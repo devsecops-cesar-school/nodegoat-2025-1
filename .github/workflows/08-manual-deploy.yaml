@@ -1,0 +1,58 @@
+name: 07-manual-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - destroy
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+
+jobs:
+  manual-operation:
+    name: ${{ github.event.inputs.action }} to ${{ github.event.inputs.environment }}
+    runs-on: [arc-runner-set]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Only allow on main branch
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download Kubernetes CLI Tools
+        uses: alexellis/arkade-get@master
+        with:
+          kubectl: latest
+
+      - name: Configure access to Kubernetes
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
+          echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
+
+      - name: Deploy to ${{ github.event.inputs.environment }}
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          NAMESPACE="nodegoat"
+          kubectl create ns ${NAMESPACE} || true
+          kubectl set image deployment/nodegoat nodegoat=${{ vars.DOCKERHUB_USERNAME }}/nodegoat:latest -n ${NAMESPACE} || true
+          kubectl apply -n ${NAMESPACE} -f k8s/nodegoat/
+          echo "Deployed to ${NAMESPACE} with image tag: latest"
+
+      - name: Destroy ${{ github.event.inputs.environment }}
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          NAMESPACE="nodegoat"
+          kubectl delete -n ${NAMESPACE} -f k8s/nodegoat/ || true
+          kubectl delete ns ${NAMESPACE} || true
+          echo "Destroyed ${NAMESPACE}"
