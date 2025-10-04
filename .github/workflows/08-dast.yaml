@@ -1,0 +1,84 @@
+name: 08-dast
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dast-owasp-zap:
+    name: DAST - OWASP ZAP
+    runs-on: [arc-runner-set]
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Wait for target application
+        run: |
+          echo "Waiting for nodegoat-web to be ready..."
+          until curl -sf http://nodegoat-web.nodegoat > /dev/null; do
+            echo "Waiting for application..."
+            sleep 3
+          done
+          echo "Application is ready!"
+
+      - name: ZAP Full Scan (GitHub Action)
+        id: zap-scan
+        # uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          docker_name: 'zaproxy/zap-stable:latest'
+          target: 'http://nodegoat-web.nodegoat'
+          cmd_options: '-n /zap/wrk/owasp-zap.context -U admin -j -d'
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: 'zap-scan-report'
+
+      # - name: ZAP Full Scan (Docker)
+      #   id: zap-scan
+      #   continue-on-error: true
+      #   run: |
+      #     mkdir -p reports/zap
+      #     chmod 777 -R reports
+
+      #     # zap-baseline.py
+      #     # zap-full-scan.py
+
+      #     docker run --rm --network host \
+      #       -v $(pwd)/reports/zap:/zap/wrk/:rw \
+      #       -v $(pwd)/owasp-zap.context:/zap/wrk/owasp-zap.context:ro \
+      #       ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+      #       -t http://nodegoat-web.nodegoat \
+      #       -n /zap/wrk/owasp-zap.context \
+      #       -U admin \
+      #       -r /zap/wrk/zap_report.html \
+      #       -w /zap/wrk/zap_report.md \
+      #       -J /zap/wrk/zap_report.json \
+      #       -m 10 \
+      #       -d \
+      #       -P 8080
+
+      # - name: Upload ZAP Report
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-scan-report
+      #     path: |
+      #       reports/zap/zap_report.html
+      #       reports/zap/zap_report.md
+      #       reports/zap/zap_report.json
+
+      # - name: Fail if ZAP found issues
+      #   if: steps.zap-scan.outcome == 'failure'
+      #   run: exit 1

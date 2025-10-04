@@ -25,11 +25,11 @@ just _info "Scanning with OWASP ZAP..."
 docker run --rm --network host --name ${ZAP_CONTAINER_NAME} \
     -v ./reports/zap:/zap/wrk/:rw \
     -v ./scripts/zap.context:/zap/wrk/zap.context \
-      ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+      zaproxy/zap-weekly zap-full-scan.py \
       -t http://${CONTAINER_NAME}:${CONTAINER_PORT} \
       -n /zap/wrk/zap.context \
       -U "admin" \
-      -r zap_report.html \
+      -r /zap/wrk/zap_report.html \
       -l WARN
 
 SCAN_RESULT=$?
